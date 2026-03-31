@@ -1,0 +1,323 @@
+{
+  "users": [
+    {
+      "id": "user_7o-pC0",
+      "name": "Jordan",
+      "dailyGoal": 8000,
+      "unlockPolicy": {
+        "stepsPerBlock": 2500,
+        "minutesPerBlock": 15,
+        "fullUnlockAtSteps": 8000
+      },
+      "graceUnlocksRemaining": 0,
+      "manualOverridesRemaining": 1,
+      "createdAt": "2026-03-31T20:47:03.528Z"
+    },
+    {
+      "id": "user_jmi6SJ",
+      "name": "Sam",
+      "dailyGoal": 7000,
+      "unlockPolicy": {
+        "stepsPerBlock": 2400,
+        "minutesPerBlock": 15,
+        "fullUnlockAtSteps": 7000
+      },
+      "graceUnlocksRemaining": 1,
+      "manualOverridesRemaining": 1,
+      "createdAt": "2026-03-31T20:47:03.528Z"
+    },
+    {
+      "id": "user_U4EeT0",
+      "name": "Priya",
+      "dailyGoal": 9000,
+      "unlockPolicy": {
+        "stepsPerBlock": 3000,
+        "minutesPerBlock": 20,
+        "fullUnlockAtSteps": 9000
+      },
+      "graceUnlocksRemaining": 2,
+      "manualOverridesRemaining": 2,
+      "createdAt": "2026-03-31T20:47:03.528Z"
+    }
+  ],
+  "steps": [
+    {
+      "id": "step_m5sJ95",
+      "userId": "user_7o-pC0",
+      "date": "2026-03-31",
+      "steps": 8000,
+      "source": "health"
+    },
+    {
+      "id": "step_REqBp3",
+      "userId": "user_7o-pC0",
+      "date": "2026-03-30",
+      "steps": 8355,
+      "source": "health"
+    },
+    {
+      "id": "step_FQYBqA",
+      "userId": "user_7o-pC0",
+      "date": "2026-03-29",
+      "steps": 8246,
+      "source": "health"
+    },
+    {
+      "id": "step_AgMmTz",
+      "userId": "user_7o-pC0",
+      "date": "2026-03-28",
+      "steps": 7635,
+      "source": "health"
+    },
+    {
+      "id": "step_hFlCe9",
+      "userId": "user_7o-pC0",
+      "date": "2026-03-27",
+      "steps": 6946,
+      "source": "health"
+    },
+    {
+      "id": "step_vthUkS",
+      "userId": "user_7o-pC0",
+      "date": "2026-03-26",
+      "steps": 6675,
+      "source": "health"
+    },
+    {
+      "id": "step_9_opq6",
+      "userId": "user_7o-pC0",
+      "date": "2026-03-25",
+      "steps": 6932,
+      "source": "health"
+    },
+    {
+      "id": "step_e-kzPv",
+      "userId": "user_jmi6SJ",
+      "date": "2026-03-31",
+      "steps": 6800,
+      "source": "health"
+    },
+    {
+      "id": "step_al6Su0",
+      "userId": "user_jmi6SJ",
+      "date": "2026-03-30",
+      "steps": 7155,
+      "source": "health"
+    },
+    {
+      "id": "step_OFY4pF",
+      "userId": "user_jmi6SJ",
+      "date": "2026-03-29",
+      "steps": 7046,
+      "source": "health"
+    },
+    {
+      "id": "step_LndXIj",
+      "userId": "user_jmi6SJ",
+      "date": "2026-03-28",
+      "steps": 6435,
+      "source": "health"
+    },
+    {
+      "id": "step_jlbonq",
+      "userId": "user_jmi6SJ",
+      "date": "2026-03-27",
+      "steps": 5746,
+      "source": "health"
+    },
+    {
+      "id": "step_Eh4_dR",
+      "userId": "user_jmi6SJ",
+      "date": "2026-03-26",
+      "steps": 5475,
+      "source": "health"
+    },
+    {
+      "id": "step_oQqbfX",
+      "userId": "user_jmi6SJ",
+      "date": "2026-03-25",
+      "steps": 5732,
+      "source": "health"
+    },
+    {
+      "id": "step_w8Xpzc",
+      "userId": "user_U4EeT0",
+      "date": "2026-03-31",
+      "steps": 9400,
+      "source": "health"
+    },
+    {
+      "id": "step_fB5aa_",
+      "userId": "user_U4EeT0",
+      "date": "2026-03-30",
+      "steps": 9755,
+      "source": "health"
+    },
+    {
+      "id": "step_kZYEVQ",
+      "userId": "user_U4EeT0",
+      "date": "2026-03-29",
+      "steps": 9646,
+      "source": "health"
+    },
+    {
+      "id": "step_-oq3B5",
+      "userId": "user_U4EeT0",
+      "date": "2026-03-28",
+      "steps": 9035,
+      "source": "health"
+    },
+    {
+      "id": "step_qbhxnM",
+      "userId": "user_U4EeT0",
+      "date": "2026-03-27",
+      "steps": 8346,
+      "source": "health"
+    },
+    {
+      "id": "step_BhVrOu",
+      "userId": "user_U4EeT0",
+      "date": "2026-03-26",
+      "steps": 8075,
+      "source": "health"
+    },
+    {
+      "id": "step_6Z5obc",
+      "userId": "user_U4EeT0",
+      "date": "2026-03-25",
+      "steps": 8332,
+      "source": "health"
+    }
+  ],
+  "apps": [
+    {
+      "id": "app_1AHvxC",
+      "userId": "user_7o-pC0",
+      "name": "Instagram",
+      "groupId": "ag_lF1LhN",
+      "enabled": true,
+      "unlockMode": "incremental",
+      "unlockCostMinutes": 10
+    },
+    {
+      "id": "app_l8ZC56",
+      "userId": "user_7o-pC0",
+      "name": "TikTok",
+      "groupId": "ag_8ga83n",
+      "enabled": true,
+      "unlockMode": "incremental",
+      "unlockCostMinutes": 15
+    },
+    {
+      "id": "app_YMPyUf",
+      "userId": "user_7o-pC0",
+      "name": "YouTube",
+      "groupId": "ag_8ga83n",
+      "enabled": true,
+      "unlockMode": "incremental",
+      "unlockCostMinutes": 20
+    },
+    {
+      "id": "app_WcJdTZ",
+      "userId": "user_7o-pC0",
+      "name": "Reddit",
+      "groupId": "ag_lF1LhN",
+      "enabled": true,
+      "unlockMode": "incremental",
+      "unlockCostMinutes": 10
+    },
+    {
+      "id": "app_PzVIwM",
+      "userId": "user_7o-pC0",
+      "name": "Chess",
+      "groupId": "ag_P3Z_x5",
+      "enabled": true,
+      "unlockMode": "full",
+      "unlockCostMinutes": 30
+    },
+    {
+      "id": "app_9lMoIY",
+      "userId": "user_7o-pC0",
+      "name": "Mail",
+      "groupId": "ag_wWfxja",
+      "enabled": true,
+      "unlockMode": "full",
+      "unlockCostMinutes": 0
+    }
+  ],
+  "appGroups": [
+    {
+      "id": "ag_lF1LhN",
+      "userId": "user_7o-pC0",
+      "name": "Social"
+    },
+    {
+      "id": "ag_8ga83n",
+      "userId": "user_7o-pC0",
+      "name": "Video"
+    },
+    {
+      "id": "ag_P3Z_x5",
+      "userId": "user_7o-pC0",
+      "name": "Games"
+    },
+    {
+      "id": "ag_wWfxja",
+      "userId": "user_7o-pC0",
+      "name": "Focus"
+    }
+  ],
+  "groups": [
+    {
+      "id": "grp_WjCgf_",
+      "name": "Morning Movers",
+      "ownerId": "user_7o-pC0",
+      "goalSteps": 30000,
+      "mode": "shared",
+      "createdAt": "2026-03-31T20:47:03.528Z"
+    }
+  ],
+  "groupMembers": [
+    {
+      "groupId": "grp_WjCgf_",
+      "userId": "user_7o-pC0",
+      "role": "owner",
+      "optOutOfUnlock": false
+    },
+    {
+      "groupId": "grp_WjCgf_",
+      "userId": "user_jmi6SJ",
+      "role": "member",
+      "optOutOfUnlock": false
+    },
+    {
+      "groupId": "grp_WjCgf_",
+      "userId": "user_U4EeT0",
+      "role": "member",
+      "optOutOfUnlock": true
+    }
+  ],
+  "unlockEvents": [
+    {
+      "id": "unlock__aeNAo",
+      "userId": "user_7o-pC0",
+      "date": "2026-03-31",
+      "type": "grace",
+      "createdAt": "2026-03-31T20:47:03.528Z"
+    },
+    {
+      "id": "unlock_GdjWbS",
+      "userId": "user_7o-pC0",
+      "date": "2026-03-31",
+      "type": "grace",
+      "createdAt": "2026-03-31T21:38:31.131Z"
+    },
+    {
+      "id": "unlock_TJUvJr",
+      "userId": "user_7o-pC0",
+      "date": "2026-03-31",
+      "type": "grace",
+      "createdAt": "2026-03-31T21:38:32.786Z"
+    }
+  ]
+}
