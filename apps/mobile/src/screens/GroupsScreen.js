@@ -27,7 +27,7 @@ const GroupsScreen = () => {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Groups" subtitle="Move together and unlock together" />
+      <ScreenHeader title="Leaderboard" subtitle="Move together and unlock together" />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.card}>
           <Text style={styles.label}>Your groups</Text>

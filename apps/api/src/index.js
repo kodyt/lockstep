@@ -1,16 +1,13 @@
 import express from 'express'
 import cors from 'cors'
 import { nanoid } from 'nanoid'
-import { initDb, getDb } from './db.js'
+import { supabase } from './supabase.js'
 
 const app = express()
 const port = process.env.PORT || 4000
 
 app.use(cors())
 app.use(express.json())
-
-await initDb()
-const db = getDb()
 
 const dateKey = (offsetDays = 0) => {
   const date = new Date()
@@ -20,50 +17,150 @@ const dateKey = (offsetDays = 0) => {
 
 const lastNDates = (days) => Array.from({ length: days }).map((_, index) => dateKey(-index))
 
-const findUser = (userId) => db.data.users.find(user => user.id === userId)
+const handleSupabaseError = (error, message = 'Database error') => {
+  if (!error) return
+  const err = new Error(message)
+  err.status = 500
+  err.cause = error
+  throw err
+}
 
-const ensureUser = (userId) => {
-  const resolvedId = userId || db.data.users[0]?.id
-  if (!resolvedId) {
-    const error = new Error('No users available')
-    error.status = 404
-    throw error
+const mapUser = (row) => row && ({
+  id: row.id,
+  name: row.name,
+  dailyGoal: row.daily_goal,
+  unlockPolicy: row.unlock_policy,
+  graceUnlocksRemaining: row.grace_unlocks_remaining,
+  manualOverridesRemaining: row.manual_overrides_remaining,
+  createdAt: row.created_at
+})
+
+const mapStep = (row) => row && ({
+  id: row.id,
+  userId: row.user_id,
+  date: row.date,
+  steps: row.steps,
+  source: row.source
+})
+
+const mapApp = (row) => row && ({
+  id: row.id,
+  userId: row.user_id,
+  name: row.name,
+  groupId: row.group_id,
+  enabled: row.enabled,
+  unlockMode: row.unlock_mode,
+  unlockCostMinutes: row.unlock_cost_minutes
+})
+
+const mapAppGroup = (row) => row && ({
+  id: row.id,
+  userId: row.user_id,
+  name: row.name
+})
+
+const mapGroup = (row) => row && ({
+  id: row.id,
+  name: row.name,
+  ownerId: row.owner_id,
+  goalSteps: row.goal_steps,
+  mode: row.mode,
+  createdAt: row.created_at
+})
+
+const mapGroupMember = (row) => row && ({
+  id: row.id,
+  groupId: row.group_id,
+  userId: row.user_id,
+  role: row.role,
+  optOutOfUnlock: row.opt_out_of_unlock
+})
+
+const fetchUserById = async (userId) => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle()
+  handleSupabaseError(error, 'Failed to load user')
+  return mapUser(data)
+}
+
+const ensureUser = async (userId) => {
+  let user = null
+  if (userId) {
+    user = await fetchUserById(userId)
   }
-  const user = findUser(resolvedId)
   if (!user) {
-    const error = new Error('User not found')
-    error.status = 404
-    throw error
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    handleSupabaseError(error, 'Failed to load users')
+    if (!data) {
+      const err = new Error('No users available')
+      err.status = 404
+      throw err
+    }
+    user = mapUser(data)
+  }
+  if (!user) {
+    const err = new Error('User not found')
+    err.status = 404
+    throw err
   }
   return user
 }
 
-const getStepsForDate = (userId, date) => db.data.steps.find(step => step.userId === userId && step.date === date)
+const getStepsForDate = async (userId, date) => {
+  const { data, error } = await supabase
+    .from('steps')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('date', date)
+    .maybeSingle()
+  handleSupabaseError(error, 'Failed to load steps')
+  return mapStep(data)
+}
 
-const setStepsForDate = (userId, date, steps, source = 'manual') => {
-  const existing = getStepsForDate(userId, date)
+const setStepsForDate = async (userId, date, steps, source = 'manual') => {
+  const existing = await getStepsForDate(userId, date)
   if (existing) {
-    existing.steps = Math.max(0, steps)
-    existing.source = source
-    return existing
+    const { data, error } = await supabase
+      .from('steps')
+      .update({
+        steps: Math.max(0, steps),
+        source
+      })
+      .eq('id', existing.id)
+      .select('*')
+      .single()
+    handleSupabaseError(error, 'Failed to update steps')
+    return mapStep(data)
   }
+
   const record = {
     id: `step_${nanoid(6)}`,
-    userId,
+    user_id: userId,
     date,
     steps: Math.max(0, steps),
     source
   }
-  db.data.steps.push(record)
-  return record
+  const { data, error } = await supabase
+    .from('steps')
+    .insert(record)
+    .select('*')
+    .single()
+  handleSupabaseError(error, 'Failed to create steps')
+  return mapStep(data)
 }
 
-const addSteps = (userId, date, delta, source = 'manual') => {
-  const existing = getStepsForDate(userId, date)
+const addSteps = async (userId, date, delta, source = 'manual') => {
+  const existing = await getStepsForDate(userId, date)
   if (existing) {
-    existing.steps = Math.max(0, existing.steps + delta)
-    existing.source = source
-    return existing
+    return setStepsForDate(userId, date, existing.steps + delta, source)
   }
   return setStepsForDate(userId, date, delta, source)
 }
@@ -143,11 +240,19 @@ const computeAppUnlocks = (apps, unlockStatus) => {
   return { unlockedApps: Math.max(0, unlocked), lockedApps: Math.max(0, lockedApps + fullApps.length) }
 }
 
-const buildDashboard = (userId) => {
-  const user = ensureUser(userId)
+const buildDashboard = async (userId) => {
+  const user = await ensureUser(userId)
   const today = dateKey()
-  const stepsToday = getStepsForDate(userId, today)?.steps ?? 0
-  const apps = db.data.apps.filter(app => app.userId === userId && app.enabled)
+  const stepsToday = (await getStepsForDate(user.id, today))?.steps ?? 0
+
+  const { data: appsData, error: appsError } = await supabase
+    .from('apps')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('enabled', true)
+  handleSupabaseError(appsError, 'Failed to load apps')
+
+  const apps = (appsData || []).map(mapApp)
   const unlockStatus = computeUnlockStatus(user, stepsToday)
   const { unlockedApps, lockedApps } = computeAppUnlocks(apps, unlockStatus)
 
@@ -168,65 +273,149 @@ app.get('/v1/health', (req, res) => {
 })
 
 app.post('/v1/users', async (req, res) => {
-  const { name, dailyGoal } = req.body || {}
-  if (!name) {
-    res.status(400).json({ error: 'name is required' })
-    return
-  }
-  const user = {
-    id: `user_${nanoid(6)}`,
-    name,
-    dailyGoal: Number(dailyGoal) || 8000,
-    unlockPolicy: {
-      stepsPerBlock: 2500,
-      minutesPerBlock: 15,
-      fullUnlockAtSteps: Number(dailyGoal) || 8000
-    },
-    graceUnlocksRemaining: 2,
-    manualOverridesRemaining: 1,
-    createdAt: new Date().toISOString()
-  }
-  db.data.users.push(user)
-  await db.write()
-  res.status(201).json(user)
-})
-
-app.get('/v1/users', (req, res) => {
-  res.json(db.data.users)
-})
-
-app.get('/v1/users/:id', (req, res) => {
   try {
-    const user = ensureUser(req.params.id)
-    const entries = db.data.steps.filter(step => step.userId === user.id)
-    const streaks = computeStreaks(entries, user.dailyGoal)
-    res.json({
-      user,
-      streaks
-    })
+    const { name, dailyGoal } = req.body || {}
+    if (!name) {
+      res.status(400).json({ error: 'name is required' })
+      return
+    }
+    const goal = Number(dailyGoal) || 8000
+    const user = {
+      id: `user_${nanoid(6)}`,
+      name,
+      daily_goal: goal,
+      unlock_policy: {
+        stepsPerBlock: 2500,
+        minutesPerBlock: 15,
+        fullUnlockAtSteps: goal
+      },
+      grace_unlocks_remaining: 2,
+      manual_overrides_remaining: 1
+    }
+
+    const { data, error } = await supabase
+      .from('users')
+      .insert(user)
+      .select('*')
+      .single()
+    handleSupabaseError(error, 'Failed to create user')
+    res.status(201).json(mapUser(data))
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message })
   }
 })
 
-app.get('/v1/profile', (req, res) => {
+app.post('/v1/users/ensure', async (req, res) => {
+  try {
+    const { authUserId, name } = req.body || {}
+    if (!authUserId) {
+      res.status(400).json({ error: 'authUserId is required' })
+      return
+    }
+
+    const existing = await fetchUserById(authUserId)
+    if (existing) {
+      res.json(existing)
+      return
+    }
+
+    const goal = 8000
+    const user = {
+      id: authUserId,
+      name: name || 'Member',
+      daily_goal: goal,
+      unlock_policy: {
+        stepsPerBlock: 2500,
+        minutesPerBlock: 15,
+        fullUnlockAtSteps: goal
+      },
+      grace_unlocks_remaining: 2,
+      manual_overrides_remaining: 1
+    }
+
+    const { data, error } = await supabase
+      .from('users')
+      .insert(user)
+      .select('*')
+      .single()
+    handleSupabaseError(error, 'Failed to create user')
+    res.status(201).json(mapUser(data))
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message })
+  }
+})
+
+app.get('/v1/users', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: true })
+    handleSupabaseError(error, 'Failed to load users')
+    res.json((data || []).map(mapUser))
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message })
+  }
+})
+
+app.get('/v1/users/:id', async (req, res) => {
+  try {
+    const user = await ensureUser(req.params.id)
+    const startDate = dateKey(-29)
+    const endDate = dateKey()
+    const { data: entriesData, error: entriesError } = await supabase
+      .from('steps')
+      .select('*')
+      .eq('user_id', user.id)
+      .gte('date', startDate)
+      .lte('date', endDate)
+    handleSupabaseError(entriesError, 'Failed to load steps')
+    const entries = (entriesData || []).map(mapStep)
+    const streaks = computeStreaks(entries, user.dailyGoal)
+    res.json({ user, streaks })
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message })
+  }
+})
+
+app.get('/v1/profile', async (req, res) => {
   try {
     const userId = req.query.userId
-    const user = ensureUser(userId)
-    const entries = db.data.steps.filter(step => step.userId === user.id)
+    const user = await ensureUser(userId)
+    const startDate = dateKey(-29)
+    const endDate = dateKey()
+
+    const { data: entriesData, error: entriesError } = await supabase
+      .from('steps')
+      .select('*')
+      .eq('user_id', user.id)
+      .gte('date', startDate)
+      .lte('date', endDate)
+    handleSupabaseError(entriesError, 'Failed to load steps')
+
+    const entries = (entriesData || []).map(mapStep)
     const streaks = computeStreaks(entries, user.dailyGoal)
+
     const last7 = lastNDates(7).map(date => ({
       date,
       steps: entries.find(entry => entry.date === date)?.steps ?? 0
     }))
-    const personalRecordDay = Math.max(0, ...entries.map(entry => entry.steps))
+
+    const { data: bestEntry, error: bestError } = await supabase
+      .from('steps')
+      .select('steps')
+      .eq('user_id', user.id)
+      .order('steps', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    handleSupabaseError(bestError, 'Failed to load personal records')
 
     res.json({
       user,
       streaks,
       history: last7,
       personalRecords: {
-        bestDay: personalRecordDay
+        bestDay: bestEntry?.steps ?? 0
       }
     })
   } catch (error) {
@@ -234,22 +423,23 @@ app.get('/v1/profile', (req, res) => {
   }
 })
 
-app.get('/v1/dashboard', (req, res) => {
+app.get('/v1/dashboard', async (req, res) => {
   try {
     const userId = req.query.userId
-    res.json(buildDashboard(userId))
+    const payload = await buildDashboard(userId)
+    res.json(payload)
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message })
   }
 })
 
-app.get('/v1/steps/today', (req, res) => {
+app.get('/v1/steps/today', async (req, res) => {
   try {
     const userId = req.query.userId
-    ensureUser(userId)
+    const user = await ensureUser(userId)
     const today = dateKey()
-    const stepsToday = getStepsForDate(userId, today)?.steps ?? 0
-    res.json({ userId, date: today, steps: stepsToday })
+    const stepsToday = (await getStepsForDate(user.id, today))?.steps ?? 0
+    res.json({ userId: user.id, date: today, steps: stepsToday })
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message })
   }
@@ -258,22 +448,25 @@ app.get('/v1/steps/today', (req, res) => {
 app.post('/v1/steps', async (req, res) => {
   try {
     const { userId, steps, source } = req.body || {}
-    ensureUser(userId)
+    const user = await ensureUser(userId)
     const today = dateKey()
-    const record = addSteps(userId, today, Number(steps) || 0, source || 'manual')
-    await db.write()
+    const record = await addSteps(user.id, today, Number(steps) || 0, source || 'manual')
     res.status(201).json({ ...record })
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message })
   }
 })
 
-app.get('/v1/apps', (req, res) => {
+app.get('/v1/apps', async (req, res) => {
   try {
     const userId = req.query.userId
-    ensureUser(userId)
-    const apps = db.data.apps.filter(app => app.userId === userId)
-    res.json(apps)
+    const user = await ensureUser(userId)
+    const { data, error } = await supabase
+      .from('apps')
+      .select('*')
+      .eq('user_id', user.id)
+    handleSupabaseError(error, 'Failed to load apps')
+    res.json((data || []).map(mapApp))
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message })
   }
@@ -282,23 +475,27 @@ app.get('/v1/apps', (req, res) => {
 app.post('/v1/apps', async (req, res) => {
   try {
     const { userId, name, groupId, unlockMode, unlockCostMinutes, enabled } = req.body || {}
-    ensureUser(userId)
+    const user = await ensureUser(userId)
     if (!name) {
       res.status(400).json({ error: 'name is required' })
       return
     }
     const appEntry = {
       id: `app_${nanoid(6)}`,
-      userId,
+      user_id: user.id,
       name,
-      groupId: groupId || null,
+      group_id: groupId || null,
       enabled: enabled ?? true,
-      unlockMode: unlockMode || 'incremental',
-      unlockCostMinutes: Number(unlockCostMinutes) || 10
+      unlock_mode: unlockMode || 'incremental',
+      unlock_cost_minutes: Number(unlockCostMinutes) || 10
     }
-    db.data.apps.push(appEntry)
-    await db.write()
-    res.status(201).json(appEntry)
+    const { data, error } = await supabase
+      .from('apps')
+      .insert(appEntry)
+      .select('*')
+      .single()
+    handleSupabaseError(error, 'Failed to create app')
+    res.status(201).json(mapApp(data))
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message })
   }
@@ -306,41 +503,60 @@ app.post('/v1/apps', async (req, res) => {
 
 app.patch('/v1/apps/:id', async (req, res) => {
   try {
-    const appEntry = db.data.apps.find(app => app.id === req.params.id)
-    if (!appEntry) {
+    const { name, groupId, unlockMode, unlockCostMinutes, enabled } = req.body || {}
+    const updates = {}
+    if (name !== undefined) updates.name = name
+    if (groupId !== undefined) updates.group_id = groupId
+    if (unlockMode !== undefined) updates.unlock_mode = unlockMode
+    if (unlockCostMinutes !== undefined) updates.unlock_cost_minutes = Number(unlockCostMinutes)
+    if (enabled !== undefined) updates.enabled = enabled
+
+    const { data, error } = await supabase
+      .from('apps')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select('*')
+      .maybeSingle()
+    handleSupabaseError(error, 'Failed to update app')
+    if (!data) {
       res.status(404).json({ error: 'app not found' })
       return
     }
-    const { name, groupId, unlockMode, unlockCostMinutes, enabled } = req.body || {}
-    if (name !== undefined) appEntry.name = name
-    if (groupId !== undefined) appEntry.groupId = groupId
-    if (unlockMode !== undefined) appEntry.unlockMode = unlockMode
-    if (unlockCostMinutes !== undefined) appEntry.unlockCostMinutes = Number(unlockCostMinutes)
-    if (enabled !== undefined) appEntry.enabled = enabled
-    await db.write()
-    res.json(appEntry)
+    res.json(mapApp(data))
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message })
   }
 })
 
 app.delete('/v1/apps/:id', async (req, res) => {
-  const index = db.data.apps.findIndex(app => app.id === req.params.id)
-  if (index === -1) {
-    res.status(404).json({ error: 'app not found' })
-    return
+  try {
+    const { data, error } = await supabase
+      .from('apps')
+      .delete()
+      .eq('id', req.params.id)
+      .select('*')
+      .maybeSingle()
+    handleSupabaseError(error, 'Failed to delete app')
+    if (!data) {
+      res.status(404).json({ error: 'app not found' })
+      return
+    }
+    res.json(mapApp(data))
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message })
   }
-  const [removed] = db.data.apps.splice(index, 1)
-  await db.write()
-  res.json(removed)
 })
 
-app.get('/v1/app-groups', (req, res) => {
+app.get('/v1/app-groups', async (req, res) => {
   try {
     const userId = req.query.userId
-    ensureUser(userId)
-    const groups = db.data.appGroups.filter(group => group.userId === userId)
-    res.json(groups)
+    const user = await ensureUser(userId)
+    const { data, error } = await supabase
+      .from('app_groups')
+      .select('*')
+      .eq('user_id', user.id)
+    handleSupabaseError(error, 'Failed to load app groups')
+    res.json((data || []).map(mapAppGroup))
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message })
   }
@@ -349,31 +565,54 @@ app.get('/v1/app-groups', (req, res) => {
 app.post('/v1/app-groups', async (req, res) => {
   try {
     const { userId, name } = req.body || {}
-    ensureUser(userId)
+    const user = await ensureUser(userId)
     if (!name) {
       res.status(400).json({ error: 'name is required' })
       return
     }
-    const group = { id: `ag_${nanoid(6)}`, userId, name }
-    db.data.appGroups.push(group)
-    await db.write()
-    res.status(201).json(group)
+    const group = { id: `ag_${nanoid(6)}`, user_id: user.id, name }
+    const { data, error } = await supabase
+      .from('app_groups')
+      .insert(group)
+      .select('*')
+      .single()
+    handleSupabaseError(error, 'Failed to create app group')
+    res.status(201).json(mapAppGroup(data))
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message })
   }
 })
 
-app.get('/v1/groups', (req, res) => {
+app.get('/v1/groups', async (req, res) => {
   try {
     const userId = req.query.userId
-    ensureUser(userId)
-    const memberships = db.data.groupMembers.filter(member => member.userId === userId)
-    const groups = memberships.map(member => ({
-      ...db.data.groups.find(group => group.id === member.groupId),
-      role: member.role,
-      optOutOfUnlock: member.optOutOfUnlock
-    }))
-    res.json(groups)
+    const user = await ensureUser(userId)
+    const { data: memberData, error: memberError } = await supabase
+      .from('group_members')
+      .select('*')
+      .eq('user_id', user.id)
+    handleSupabaseError(memberError, 'Failed to load group memberships')
+
+    const memberships = (memberData || []).map(mapGroupMember)
+    if (!memberships.length) {
+      res.json([])
+      return
+    }
+
+    const groupIds = memberships.map(member => member.groupId)
+    const { data: groupData, error: groupError } = await supabase
+      .from('groups')
+      .select('*')
+      .in('id', groupIds)
+    handleSupabaseError(groupError, 'Failed to load groups')
+
+    const groups = (groupData || []).map(mapGroup)
+    const response = memberships.map(member => {
+      const group = groups.find(entry => entry.id === member.groupId)
+      return group ? { ...group, role: member.role, optOutOfUnlock: member.optOutOfUnlock } : null
+    }).filter(Boolean)
+
+    res.json(response)
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message })
   }
@@ -382,7 +621,7 @@ app.get('/v1/groups', (req, res) => {
 app.post('/v1/groups', async (req, res) => {
   try {
     const { userId, name, goalSteps, mode } = req.body || {}
-    const user = ensureUser(userId)
+    const user = await ensureUser(userId)
     if (!name) {
       res.status(400).json({ error: 'name is required' })
       return
@@ -390,15 +629,30 @@ app.post('/v1/groups', async (req, res) => {
     const group = {
       id: `grp_${nanoid(6)}`,
       name,
-      ownerId: user.id,
-      goalSteps: Number(goalSteps) || 20000,
-      mode: mode || 'shared',
-      createdAt: new Date().toISOString()
+      owner_id: user.id,
+      goal_steps: Number(goalSteps) || 20000,
+      mode: mode || 'shared'
     }
-    db.data.groups.push(group)
-    db.data.groupMembers.push({ groupId: group.id, userId: user.id, role: 'owner', optOutOfUnlock: false })
-    await db.write()
-    res.status(201).json(group)
+    const { data: groupData, error: groupError } = await supabase
+      .from('groups')
+      .insert(group)
+      .select('*')
+      .single()
+    handleSupabaseError(groupError, 'Failed to create group')
+
+    const membership = {
+      id: `gm_${nanoid(6)}`,
+      group_id: group.id,
+      user_id: user.id,
+      role: 'owner',
+      opt_out_of_unlock: false
+    }
+    const { error: memberError } = await supabase
+      .from('group_members')
+      .insert(membership)
+    handleSupabaseError(memberError, 'Failed to create group membership')
+
+    res.status(201).json(mapGroup(groupData))
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message })
   }
@@ -407,49 +661,100 @@ app.post('/v1/groups', async (req, res) => {
 app.post('/v1/groups/:id/join', async (req, res) => {
   try {
     const { userId } = req.body || {}
-    ensureUser(userId)
-    const group = db.data.groups.find(entry => entry.id === req.params.id)
-    if (!group) {
+    const user = await ensureUser(userId)
+    const { data: groupData, error: groupError } = await supabase
+      .from('groups')
+      .select('*')
+      .eq('id', req.params.id)
+      .maybeSingle()
+    handleSupabaseError(groupError, 'Failed to load group')
+    if (!groupData) {
       res.status(404).json({ error: 'group not found' })
       return
     }
-    const exists = db.data.groupMembers.find(member => member.groupId === group.id && member.userId === userId)
-    if (exists) {
-      res.status(200).json({ groupId: group.id, userId })
+
+    const { data: existing, error: existingError } = await supabase
+      .from('group_members')
+      .select('*')
+      .eq('group_id', req.params.id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    handleSupabaseError(existingError, 'Failed to check membership')
+    if (existing) {
+      res.status(200).json({ groupId: req.params.id, userId: user.id })
       return
     }
-    db.data.groupMembers.push({ groupId: group.id, userId, role: 'member', optOutOfUnlock: false })
-    await db.write()
-    res.status(201).json({ groupId: group.id, userId })
+
+    const membership = {
+      id: `gm_${nanoid(6)}`,
+      group_id: req.params.id,
+      user_id: user.id,
+      role: 'member',
+      opt_out_of_unlock: false
+    }
+    const { error: memberError } = await supabase
+      .from('group_members')
+      .insert(membership)
+    handleSupabaseError(memberError, 'Failed to join group')
+
+    res.status(201).json({ groupId: req.params.id, userId: user.id })
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message })
   }
 })
 
-app.get('/v1/leaderboard', (req, res) => {
+app.get('/v1/leaderboard', async (req, res) => {
   try {
     const scope = req.query.scope || 'daily'
     const groupId = req.query.groupId
     const rangeDays = scope === 'weekly' ? 7 : 1
     const dateRange = lastNDates(rangeDays)
 
-    let userIds = db.data.users.map(user => user.id)
+    let userIds = []
     if (groupId) {
-      userIds = db.data.groupMembers.filter(member => member.groupId === groupId).map(member => member.userId)
+      const { data: membersData, error: membersError } = await supabase
+        .from('group_members')
+        .select('user_id')
+        .eq('group_id', groupId)
+      handleSupabaseError(membersError, 'Failed to load group members')
+      userIds = (membersData || []).map(entry => entry.user_id)
+    } else {
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id')
+      handleSupabaseError(usersError, 'Failed to load users')
+      userIds = (usersData || []).map(entry => entry.id)
     }
 
-    const entries = userIds.map(userId => {
-      const user = ensureUser(userId)
-      const total = db.data.steps
-        .filter(step => step.userId === userId && dateRange.includes(step.date))
-        .reduce((sum, step) => sum + step.steps, 0)
+    if (!userIds.length) {
+      res.json({ scope, groupId, entries: [] })
+      return
+    }
 
-      return {
-        userId,
-        name: user.name,
-        steps: total
-      }
-    }).sort((a, b) => b.steps - a.steps)
+    const { data: stepsData, error: stepsError } = await supabase
+      .from('steps')
+      .select('*')
+      .in('user_id', userIds)
+      .in('date', dateRange)
+    handleSupabaseError(stepsError, 'Failed to load steps')
+
+    const totals = new Map(userIds.map(id => [id, 0]))
+    for (const row of stepsData || []) {
+      totals.set(row.user_id, (totals.get(row.user_id) || 0) + row.steps)
+    }
+
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('*')
+      .in('id', userIds)
+    handleSupabaseError(usersError, 'Failed to load users')
+    const users = (usersData || []).map(mapUser)
+
+    const entries = users.map(user => ({
+      userId: user.id,
+      name: user.name,
+      steps: totals.get(user.id) || 0
+    })).sort((a, b) => b.steps - a.steps)
 
     res.json({ scope, groupId, entries })
   } catch (error) {
@@ -460,21 +765,33 @@ app.get('/v1/leaderboard', (req, res) => {
 app.post('/v1/grace-unlock', async (req, res) => {
   try {
     const { userId } = req.body || {}
-    const user = ensureUser(userId)
+    const user = await ensureUser(userId)
     if (user.graceUnlocksRemaining <= 0) {
       res.status(400).json({ error: 'No grace unlocks remaining' })
       return
     }
-    user.graceUnlocksRemaining -= 1
-    db.data.unlockEvents.push({
+
+    const newCount = user.graceUnlocksRemaining - 1
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('users')
+      .update({ grace_unlocks_remaining: newCount })
+      .eq('id', user.id)
+      .select('*')
+      .single()
+    handleSupabaseError(updateError, 'Failed to update user')
+
+    const unlockEvent = {
       id: `unlock_${nanoid(6)}`,
-      userId,
+      user_id: user.id,
       date: dateKey(),
-      type: 'grace',
-      createdAt: new Date().toISOString()
-    })
-    await db.write()
-    res.status(201).json({ userId, graceUnlocksRemaining: user.graceUnlocksRemaining })
+      type: 'grace'
+    }
+    const { error: unlockError } = await supabase
+      .from('unlock_events')
+      .insert(unlockEvent)
+    handleSupabaseError(unlockError, 'Failed to log unlock')
+
+    res.status(201).json({ userId: updatedUser.id, graceUnlocksRemaining: updatedUser.grace_unlocks_remaining })
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message })
   }

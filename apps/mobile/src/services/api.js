@@ -27,6 +27,17 @@ export const getUsers = async () => {
   }
 }
 
+export const ensureUserRecord = async (authUserId, name) => {
+  try {
+    return await request('/users/ensure', {
+      method: 'POST',
+      body: JSON.stringify({ authUserId, name })
+    })
+  } catch (error) {
+    return { ...mockUser, id: authUserId, name: name || mockUser.name }
+  }
+}
+
 export const getDashboard = async (userId) => {
   try {
     return await request(`/dashboard?userId=${encodeURIComponent(userId)}`)

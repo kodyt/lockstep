@@ -7,5 +7,8 @@
   "scripts": {
     "dev:api": "npm --workspace apps/api run dev",
     "dev:mobile": "npm --workspace apps/mobile run dev"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.101.1"
   }
 }

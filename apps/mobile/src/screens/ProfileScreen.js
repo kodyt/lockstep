@@ -6,6 +6,7 @@ import StatCard from '../components/StatCard'
 import ToggleRow from '../components/ToggleRow'
 import { useApp } from '../context/AppContext'
 import { getProfile } from '../services/api'
+import { supabase } from '../services/supabase'
 import { colors, radius, spacing } from '../theme'
 
 const ProfileScreen = () => {
@@ -77,6 +78,7 @@ const ProfileScreen = () => {
             <PrimaryButton label="Edit goal" variant="ghost" onPress={() => {}} />
             <PrimaryButton label="HealthKit sync" onPress={() => {}} />
           </View>
+          <PrimaryButton label="Log out" variant="ghost" onPress={() => supabase.auth.signOut()} />
         </View>
 
         <View style={styles.card}>

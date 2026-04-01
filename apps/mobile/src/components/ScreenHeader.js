@@ -1,14 +1,16 @@
 import { LinearGradient } from 'expo-linear-gradient'
 import { StyleSheet, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors, spacing } from '../theme'
 
 const ScreenHeader = ({ title, subtitle, rightSlot }) => {
+  const insets = useSafeAreaInsets()
   return (
     <LinearGradient
       colors={['#1A2A40', '#0B1220']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={styles.wrapper}
+      style={[styles.wrapper, { paddingTop: spacing.lg + insets.top }]}
     >
       <View style={styles.textBlock}>
         <Text style={styles.title}>{title}</Text>
@@ -22,7 +24,7 @@ const ScreenHeader = ({ title, subtitle, rightSlot }) => {
 const styles = StyleSheet.create({
   wrapper: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingBottom: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border
   },
