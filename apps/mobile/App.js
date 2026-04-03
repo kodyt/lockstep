@@ -12,6 +12,7 @@ import GroupsScreen from './src/screens/GroupsScreen'
 import ProfileScreen from './src/screens/ProfileScreen'
 import OnboardingScreen from './src/screens/OnboardingScreen'
 import AuthScreen from './src/screens/AuthScreen'
+import ResetPasswordScreen from './src/screens/ResetPasswordScreen'
 import { AppContext } from './src/context/AppContext'
 import { ensureUserRecord } from './src/services/api'
 import { supabase } from './src/services/supabase'
@@ -19,6 +20,7 @@ import { colors } from './src/theme'
 
 const Tab = createBottomTabNavigator()
 const Stack = createNativeStackNavigator()
+const AuthStack = createNativeStackNavigator()
 
 const tabIcons = {
   Home: 'home-variant',
@@ -183,7 +185,14 @@ export default function App() {
   }
 
   if (!session) {
-    return <AuthScreen />
+    return (
+      <NavigationContainer>
+        <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+          <AuthStack.Screen name="AuthHome" component={AuthScreen} />
+          <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        </AuthStack.Navigator>
+      </NavigationContainer>
+    )
   }
 
   if (!user) {
