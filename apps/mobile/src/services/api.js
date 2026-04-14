@@ -92,11 +92,19 @@ export const getProfile = async (userId) => {
   }
 }
 
-export const addSteps = async (userId, steps) => {
+export const getStepsToday = async (userId) => {
+  try {
+    return await request(`/steps/today?userId=${encodeURIComponent(userId)}`)
+  } catch (error) {
+    return { userId, date: new Date().toLocaleDateString('en-CA'), steps: 0 }
+  }
+}
+
+export const addSteps = async (userId, steps, source = 'manual') => {
   try {
     return await request('/steps', {
       method: 'POST',
-      body: JSON.stringify({ userId, steps, source: 'manual' })
+      body: JSON.stringify({ userId, steps, source })
     })
   } catch (error) {
     return { userId, steps }

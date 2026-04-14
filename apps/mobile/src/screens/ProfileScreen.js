@@ -6,6 +6,7 @@ import StatCard from '../components/StatCard'
 import ToggleRow from '../components/ToggleRow'
 import { useApp } from '../context/AppContext'
 import { getProfile } from '../services/api'
+import { syncHealthSteps } from '../services/healthkit'
 import { supabase } from '../services/supabase'
 import { colors, radius, spacing } from '../theme'
 
@@ -14,6 +15,8 @@ const ProfileScreen = () => {
   const [profile, setProfile] = useState(null)
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [groupUpdatesEnabled, setGroupUpdatesEnabled] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -23,6 +26,26 @@ const ProfileScreen = () => {
     }
     load()
   }, [user])
+
+  const handleHealthSync = async () => {
+    if (!user || syncing) return
+    setSyncing(true)
+    setSyncMessage('')
+    try {
+      const result = await syncHealthSteps(user.id)
+      if (result.delta > 0) {
+        setSyncMessage(`Synced ${result.delta.toLocaleString()} steps from HealthKit.`)
+      } else {
+        setSyncMessage(`Already up to date at ${result.healthSteps.toLocaleString()} steps.`)
+      }
+      const data = await getProfile(user.id)
+      setProfile(data)
+    } catch (error) {
+      setSyncMessage(error?.message || 'HealthKit sync failed.')
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const history = profile?.history ?? []
 
@@ -76,8 +99,9 @@ const ProfileScreen = () => {
           />
           <View style={styles.inlineButtons}>
             <PrimaryButton label="Edit goal" variant="ghost" onPress={() => {}} />
-            <PrimaryButton label="HealthKit sync" onPress={() => {}} />
+            <PrimaryButton label={syncing ? 'Syncing...' : 'HealthKit sync'} onPress={handleHealthSync} />
           </View>
+          {syncMessage ? <Text style={styles.helper}>{syncMessage}</Text> : null}
           <PrimaryButton label="Log out" variant="ghost" onPress={() => supabase.auth.signOut()} />
         </View>
 

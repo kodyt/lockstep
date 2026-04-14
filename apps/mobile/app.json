@@ -10,10 +10,24 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kt2102.lockstep"
     },
+    "plugins": [
+      [
+        "react-native-health",
+        {
+          "healthSharePermission": "Allow Lockstep to read your step count from Health.",
+          "healthUpdatePermission": "Allow Lockstep to write workout data to Health."
+        }
+      ],
+      "expo-dev-client"
+    ],
     "extra": {
       "apiBase": "http://localhost:4000/v1"
+    },
+    "android": {
+      "package": "com.kt2102.lockstep"
     }
   }
 }
