@@ -98,7 +98,6 @@ const ProfileScreen = () => {
             onChange={() => {}}
           />
           <View style={styles.inlineButtons}>
-            <PrimaryButton label="Edit goal" variant="ghost" onPress={() => {}} />
             <PrimaryButton label={syncing ? 'Syncing...' : 'HealthKit sync'} onPress={handleHealthSync} />
           </View>
           {syncMessage ? <Text style={styles.helper}>{syncMessage}</Text> : null}

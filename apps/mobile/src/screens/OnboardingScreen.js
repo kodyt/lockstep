@@ -1,6 +1,11 @@
 import { useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, TextInput, View } from 'react-native'
 import PrimaryButton from '../components/PrimaryButton'
+import {
+  chooseBlockedApps,
+  requestControlsAuthorization,
+  setDailyGoal
+} from '../services/lockstepControls'
 import { colors, radius, spacing } from '../theme'
 
 const steps = [
@@ -20,15 +25,40 @@ const steps = [
 
 const OnboardingScreen = ({ onFinish }) => {
   const [stepIndex, setStepIndex] = useState(0)
+  const [goal, setGoal] = useState('8000')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
   const step = steps[stepIndex]
 
-  const handleNext = () => {
-    if (stepIndex === steps.length - 1) {
-      onFinish()
-      return
+  const handleNext = async () => {
+    if (busy) return
+    setBusy(true)
+    setMessage('')
+    try {
+      if (stepIndex === 0) {
+        await requestControlsAuthorization()
+      } else if (stepIndex === 1) {
+        const parsedGoal = Number(goal.replace(/[^0-9]/g, ''))
+        if (!parsedGoal) throw new Error('Enter a goal greater than zero.')
+        await setDailyGoal(parsedGoal)
+      } else {
+        await chooseBlockedApps()
+        onFinish()
+        return
+      }
+      setStepIndex(prev => prev + 1)
+    } catch (error) {
+      setMessage(error?.message || 'Setup could not be completed.')
+    } finally {
+      setBusy(false)
     }
-    setStepIndex(prev => prev + 1)
   }
+
+  const buttonLabels = [
+    'Connect permissions',
+    `Save ${Number(goal || 0).toLocaleString()}-step goal`,
+    'Choose apps'
+  ]
 
   return (
     <View style={styles.container}>
@@ -36,12 +66,23 @@ const OnboardingScreen = ({ onFinish }) => {
         <Text style={styles.eyebrow}>Step {stepIndex + 1} of {steps.length}</Text>
         <Text style={styles.title}>{step.title}</Text>
         <Text style={styles.body}>{step.body}</Text>
+        {stepIndex === 1 ? (
+          <View style={styles.goalRow}>
+            <TextInput
+              keyboardType="number-pad"
+              maxLength={6}
+              style={styles.input}
+              value={goal}
+              onChangeText={value => setGoal(value.replace(/[^0-9]/g, ''))}
+            />
+            <Text style={styles.goalLabel}>steps</Text>
+          </View>
+        ) : null}
+        {message ? <Text style={styles.message}>{message}</Text> : null}
       </View>
       <View style={styles.actions}>
-        <PrimaryButton label={stepIndex === steps.length - 1 ? 'Start Moving' : 'Continue'} onPress={handleNext} />
-        {stepIndex !== steps.length - 1 ? (
-          <PrimaryButton label="Skip setup" variant="ghost" onPress={onFinish} />
-        ) : null}
+        <PrimaryButton label={busy ? 'Working...' : buttonLabels[stepIndex]} onPress={handleNext} />
+        <PrimaryButton label="Finish later" variant="ghost" onPress={onFinish} />
       </View>
     </View>
   )
@@ -78,6 +119,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     lineHeight: 20
+  },
+  goalRow: {
+    marginTop: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    color: colors.textPrimary,
+    backgroundColor: colors.surfaceAlt,
+    fontSize: 22,
+    fontWeight: '700'
+  },
+  goalLabel: {
+    color: colors.textSecondary,
+    fontSize: 14
+  },
+  message: {
+    marginTop: spacing.md,
+    color: colors.warning,
+    fontSize: 13
   },
   actions: {
     marginTop: spacing.lg,

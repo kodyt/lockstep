@@ -64,3 +64,13 @@ create table if not exists unlock_events (
   type text not null,
   created_at timestamptz not null default now()
 );
+
+-- The Express API connects as service_role, so explicitly grant it access to
+-- objects created through the SQL editor and to future tables/sequences.
+grant usage on schema public to service_role;
+grant all privileges on all tables in schema public to service_role;
+grant all privileges on all sequences in schema public to service_role;
+alter default privileges in schema public
+  grant all privileges on tables to service_role;
+alter default privileges in schema public
+  grant all privileges on sequences to service_role;

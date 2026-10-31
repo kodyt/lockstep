@@ -3,22 +3,35 @@
     "name": "Lockstep",
     "slug": "lockstep",
     "version": "0.1.0",
-    "newArchEnabled": true,
     "orientation": "portrait",
     "scheme": "lockstep",
+    "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kt2102.lockstep"
+      "bundleIdentifier": "com.kt2102.lockstep",
+      "icon": "./assets/icon.png",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Lockstep reads your step count to unlock the apps you choose."
+      },
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.background-delivery": true,
+        "com.apple.developer.family-controls": true,
+        "com.apple.security.application-groups": [
+          "group.com.kt2102.lockstep"
+        ]
+      }
     },
     "plugins": [
       [
-        "react-native-health",
+        "expo-build-properties",
         {
-          "healthSharePermission": "Allow Lockstep to read your step count from Health.",
-          "healthUpdatePermission": "Allow Lockstep to write workout data to Health."
+          "ios": {
+            "deploymentTarget": "16.4"
+          }
         }
       ],
       "expo-dev-client"

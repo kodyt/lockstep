@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { StatusBar } from 'expo-status-bar'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as Linking from 'expo-linking'
 import HomeScreen from './src/screens/HomeScreen'
@@ -22,6 +23,7 @@ import { colors } from './src/theme'
 const Tab = createBottomTabNavigator()
 const Stack = createNativeStackNavigator()
 const AuthStack = createNativeStackNavigator()
+const ONBOARDING_KEY = '@lockstep/onboarding-complete'
 
 const tabIcons = {
   Home: 'home-variant',
@@ -100,7 +102,13 @@ export default function App() {
   const [session, setSession] = useState(null)
   const [user, setUser] = useState(null)
   const [ready, setReady] = useState(false)
-  const [hasOnboarded, setHasOnboarded] = useState(false)
+  const [hasOnboarded, setHasOnboarded] = useState(null)
+
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDING_KEY)
+      .then(value => setHasOnboarded(value === 'true'))
+      .catch(() => setHasOnboarded(false))
+  }, [])
 
   useEffect(() => {
     const initSession = async () => {
@@ -177,7 +185,16 @@ export default function App() {
     loadUser()
   }, [session])
 
-  if (!ready) {
+  const finishOnboarding = async () => {
+    setHasOnboarded(true)
+    try {
+      await AsyncStorage.setItem(ONBOARDING_KEY, 'true')
+    } catch (error) {
+      console.warn('Could not persist onboarding state', error)
+    }
+  }
+
+  if (!ready || hasOnboarded === null) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator size={36} color={colors.accent} />
@@ -211,7 +228,7 @@ export default function App() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {!hasOnboarded ? (
             <Stack.Screen name="Onboarding">
-              {() => <OnboardingScreen onFinish={() => setHasOnboarded(true)} />}
+              {() => <OnboardingScreen onFinish={finishOnboarding} />}
             </Stack.Screen>
           ) : (
             <Stack.Screen name="Main" component={AppTabs} />
