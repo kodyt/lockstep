@@ -1,5 +1,17 @@
 node_modules
 .env
 .expo/
-apps/mobile/.expo/
 node_modules.stale/
+
+# Local editor settings
+.vscode/
+
+# The Expo app lives in apps/mobile; ignore accidental root-level prebuild output.
+/App.js
+/app.json
+/eas.json
+/android/
+/ios/
+
+# Duplicate Android files created with a " 2" suffix.
+apps/mobile/android/* 2*
